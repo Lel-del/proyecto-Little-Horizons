@@ -193,21 +193,101 @@ Al iniciar, la aplicación verifica la conexión a MySQL y muestra el menú prin
 
 ## 8. Estructura del Proyecto
 
+La estructura sigue el ejemplo de la guía (`src/com/littlehorizons/erp/` con `model/`, `view/`, `controller/`, `util/` y `Main.java`) y añade `dao/`, `service/` y `config/`, extensión permitida explícitamente por la guía para respetar la separación MVC.
+
+| Requisito de la guía | Implementación en el repositorio |
+|---|---|
+| `src/com/littlehorizons/erp/Main.java` | Punto de entrada de la aplicación |
+| `model/` (entidades del dominio) | 21 clases JavaBeans |
+| `view/` (interfaces de consola) | 8 vistas (una por módulo + menú principal) |
+| `controller/` (lógica de negocio) | 7 controladores con validaciones |
+| `util/` (utilidades compartidas) | `AppLogger`, `ConsolePrinter`, `CufeGenerator`, `InputValidator` |
+| `dao/` (permitido por la guía) | 22 DAO + `DatabaseException` |
+| `service/` (permitido por la guía) | `InvoiceService`, `ReportExportService` |
+| `config/` (permitido por la guía) | `DatabaseConnection` (Singleton JDBC) |
+| `docs/database.sql` | Sección 1 DDL + Sección 2 DML |
+| `README.md` | Las 16 secciones exigidas |
+
 ```
 proyecto-littleHorizons/
 ├── src/
 │   └── com/littlehorizons/erp/
-│       ├── Main.java                 # Punto de entrada
-│       ├── config/                   # Conexión JDBC (Singleton)
+│       ├── Main.java
+│       ├── config/
 │       │   └── DatabaseConnection.java
-│       ├── model/                    # Entidades del dominio (18 clases)
-│       ├── dao/                      # Acceso a datos con PreparedStatement
-│       ├── controller/               # Lógica de negocio y validaciones
-│       ├── service/                  # Facturación TXT y exportación de reportes
-│       ├── view/                     # Interfaz de consola por módulo
-│       └── util/                     # Logger, validación de entradas, formato
+│       ├── controller/
+│       │   ├── AcademicController.java
+│       │   ├── ExtracurricularController.java
+│       │   ├── FinancialController.java
+│       │   ├── ReportController.java
+│       │   ├── ResourceController.java
+│       │   ├── StudentController.java
+│       │   └── TeacherController.java
+│       ├── dao/
+│       │   ├── AcademicRecordDAO.java
+│       │   ├── AttendanceDAO.java
+│       │   ├── ClubDAO.java
+│       │   ├── ClubMembershipDAO.java
+│       │   ├── DatabaseException.java
+│       │   ├── EnrollmentDAO.java
+│       │   ├── EventDAO.java
+│       │   ├── EventParticipantDAO.java
+│       │   ├── GradeDAO.java
+│       │   ├── GuardianDAO.java
+│       │   ├── InvoiceDAO.java
+│       │   ├── PaymentConceptDAO.java
+│       │   ├── PaymentDAO.java
+│       │   ├── ReportDAO.java
+│       │   ├── ResourceCategoryDAO.java
+│       │   ├── ResourceDAO.java
+│       │   ├── ResourceLoanDAO.java
+│       │   ├── StudentDAO.java
+│       │   ├── StudentFeeDAO.java
+│       │   ├── SubjectDAO.java
+│       │   ├── SubjectEnrollmentDAO.java
+│       │   ├── TeacherAssignmentDAO.java
+│       │   └── TeacherDAO.java
+│       ├── model/
+│       │   ├── AcademicRecord.java
+│       │   ├── Attendance.java
+│       │   ├── Club.java
+│       │   ├── ClubMembership.java
+│       │   ├── Enrollment.java
+│       │   ├── EventParticipant.java
+│       │   ├── Grade.java
+│       │   ├── Guardian.java
+│       │   ├── Invoice.java
+│       │   ├── Payment.java
+│       │   ├── PaymentConcept.java
+│       │   ├── Resource.java
+│       │   ├── ResourceCategory.java
+│       │   ├── ResourceLoan.java
+│       │   ├── SchoolEvent.java
+│       │   ├── Student.java
+│       │   ├── StudentFee.java
+│       │   ├── Subject.java
+│       │   ├── SubjectEnrollment.java
+│       │   ├── Teacher.java
+│       │   └── TeacherAssignment.java
+│       ├── service/
+│       │   ├── InvoiceService.java
+│       │   └── ReportExportService.java
+│       ├── util/
+│       │   ├── AppLogger.java
+│       │   ├── ConsolePrinter.java
+│       │   ├── CufeGenerator.java
+│       │   └── InputValidator.java
+│       └── view/
+│           ├── AcademicView.java
+│           ├── ExtracurricularView.java
+│           ├── FinancialView.java
+│           ├── MainView.java
+│           ├── ReportView.java
+│           ├── ResourceView.java
+│           ├── StudentView.java
+│           └── TeacherView.java
 ├── docs/
-│   └── database.sql                  # Sección DDL + sección DML
+│   └── database.sql                  # Sección 1 DDL + Sección 2 DML
 ├── config/
 │   ├── db.properties                 # Credenciales locales (no versionado)
 │   └── db.properties.example         # Plantilla de configuración
@@ -215,7 +295,17 @@ proyecto-littleHorizons/
 │   └── mysql-connector-j-8.4.0.jar
 ├── build.ps1                         # Script de compilación (Windows)
 ├── run.ps1                           # Script de ejecución (Windows)
-└── README.md
+├── README.md
+└── little-horizons.md                # Enunciado de la guía
+```
+
+Archivos generados en tiempo de ejecución (excluidos por `.gitignore`):
+
+```
+bin/                                  # Clases compiladas
+invoices/factura_NNNNNN.txt           # Facturas electrónicas simuladas
+reports/reporte_consolidado_*.txt     # Reportes exportados
+error_log.txt                         # Registro de eventos y errores
 ```
 
 ### Arquitectura MVC

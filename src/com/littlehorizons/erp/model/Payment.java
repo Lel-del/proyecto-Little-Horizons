@@ -20,6 +20,9 @@ public class Payment {
     private String notes;
     private String studentName;
     private String guardianName;
+    private String clientDocumentType;
+    private String clientDocument;
+    private String clientAddress;
     private String conceptName;
 
     public Payment() {
@@ -127,6 +130,30 @@ public class Payment {
 
     public void setGuardianName(String guardianName) {
         this.guardianName = guardianName;
+    }
+
+    public String getClientDocumentType() {
+        return clientDocumentType;
+    }
+
+    public void setClientDocumentType(String clientDocumentType) {
+        this.clientDocumentType = clientDocumentType;
+    }
+
+    public String getClientDocument() {
+        return clientDocument;
+    }
+
+    public void setClientDocument(String clientDocument) {
+        this.clientDocument = clientDocument;
+    }
+
+    public String getClientAddress() {
+        return clientAddress;
+    }
+
+    public void setClientAddress(String clientAddress) {
+        this.clientAddress = clientAddress;
     }
 
     public String getConceptName() {

@@ -19,10 +19,20 @@ import java.util.Optional;
 public class InvoiceDAO {
 
     public int insert(Invoice invoice) {
+        try (Connection conn = DatabaseConnection.getInstance().getConnection()) {
+            return insert(invoice, conn);
+        } catch (SQLException ex) {
+            throw new DatabaseException("Error al registrar la factura electrónica", ex);
+        }
+    }
+
+    /**
+     * Inserts an invoice using an externally managed connection so callers can enlist it in a transaction.
+     */
+    public int insert(Invoice invoice, Connection conn) {
         String sql = "INSERT INTO facturas (numero_factura, id_pago, fecha_emision, cufe, nombre_archivo_txt, ruta_archivo) " +
                 "VALUES (?, ?, ?, ?, ?, ?)";
-        try (Connection conn = DatabaseConnection.getInstance().getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setString(1, invoice.getInvoiceNumber());
             ps.setInt(2, invoice.getPaymentId());
             ps.setDate(3, Date.valueOf(invoice.getIssueDate()));
@@ -44,9 +54,19 @@ public class InvoiceDAO {
     }
 
     public Optional<Invoice> findByPayment(int paymentId) {
+        try (Connection conn = DatabaseConnection.getInstance().getConnection()) {
+            return findByPayment(paymentId, conn);
+        } catch (SQLException ex) {
+            throw new DatabaseException("Error al consultar la factura del pago", ex);
+        }
+    }
+
+    /**
+     * Finds the invoice associated with a payment using an externally managed connection.
+     */
+    public Optional<Invoice> findByPayment(int paymentId, Connection conn) {
         String sql = "SELECT * FROM facturas WHERE id_pago = ?";
-        try (Connection conn = DatabaseConnection.getInstance().getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, paymentId);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? Optional.of(map(rs)) : Optional.empty();
@@ -72,12 +92,24 @@ public class InvoiceDAO {
     }
 
     /**
-     * Generates the next consecutive invoice number based on the current maximum.
+     * Generates the next consecutive invoice number based on the highest numeric suffix currently stored.
+     * The unique constraint on numero_factura protects against duplicates.
      */
     public String nextInvoiceNumber() {
-        String sql = "SELECT COUNT(*) + 1 AS siguiente FROM facturas";
-        try (Connection conn = DatabaseConnection.getInstance().getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql);
+        try (Connection conn = DatabaseConnection.getInstance().getConnection()) {
+            return nextInvoiceNumber(conn);
+        } catch (SQLException ex) {
+            throw new DatabaseException("Error al calcular el consecutivo de factura", ex);
+        }
+    }
+
+    /**
+     * Calculates the next invoice number using an externally managed connection.
+     */
+    public String nextInvoiceNumber(Connection conn) {
+        String sql = "SELECT COALESCE(MAX(CAST(SUBSTRING(numero_factura, 5) AS UNSIGNED)), 0) + 1 AS siguiente " +
+                "FROM facturas WHERE numero_factura LIKE 'FAC-%'";
+        try (PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
             int next = rs.next() ? rs.getInt("siguiente") : 1;
             return String.format("FAC-%06d", next);

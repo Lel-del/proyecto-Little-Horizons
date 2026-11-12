@@ -22,17 +22,30 @@ public class PaymentDAO {
     private static final String SELECT_BASE =
             "SELECT p.*, CONCAT_WS(' ', e.primer_nombre, e.segundo_nombre, e.primer_apellido, e.segundo_apellido) AS nombre_estudiante, " +
             "CONCAT_WS(' ', a.primer_nombre, a.segundo_nombre, a.primer_apellido, a.segundo_apellido) AS nombre_acudiente, " +
+            "COALESCE(a.tipo_documento, e.tipo_documento) AS tipo_documento_cliente, " +
+            "COALESCE(a.numero_documento, e.numero_documento) AS documento_cliente, " +
+            "COALESCE(a.direccion, e.direccion) AS direccion_cliente, " +
             "c.nombre_concepto FROM pagos p " +
             "JOIN estudiantes e ON e.id_estudiante = p.id_estudiante " +
             "LEFT JOIN acudientes a ON a.id_acudiente = p.id_acudiente " +
             "JOIN conceptos_pago c ON c.id_concepto = p.id_concepto ";
 
     public int insert(Payment payment) {
+        try (Connection conn = DatabaseConnection.getInstance().getConnection()) {
+            return insert(payment, conn);
+        } catch (SQLException ex) {
+            throw new DatabaseException("Error al registrar el pago", ex);
+        }
+    }
+
+    /**
+     * Inserts a payment using an externally managed connection so callers can enlist it in a transaction.
+     */
+    public int insert(Payment payment, Connection conn) {
         String sql = "INSERT INTO pagos (id_estudiante, id_acudiente, id_concepto, monto_pagado, fecha_pago, " +
                 "metodo_pago, numero_recibo, `año_academico`, periodo_academico, notas) " +
                 "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-        try (Connection conn = DatabaseConnection.getInstance().getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setInt(1, payment.getStudentId());
             if (payment.getGuardianId() != null) {
                 ps.setInt(2, payment.getGuardianId());
@@ -77,8 +90,18 @@ public class PaymentDAO {
     }
 
     public Optional<Payment> findById(int paymentId) {
-        try (Connection conn = DatabaseConnection.getInstance().getConnection();
-             PreparedStatement ps = conn.prepareStatement(SELECT_BASE + "WHERE p.id_pago = ?")) {
+        try (Connection conn = DatabaseConnection.getInstance().getConnection()) {
+            return findById(paymentId, conn);
+        } catch (SQLException ex) {
+            throw new DatabaseException("Error al consultar el pago ID " + paymentId, ex);
+        }
+    }
+
+    /**
+     * Finds a payment using an externally managed connection (transaction-aware).
+     */
+    public Optional<Payment> findById(int paymentId, Connection conn) {
+        try (PreparedStatement ps = conn.prepareStatement(SELECT_BASE + "WHERE p.id_pago = ?")) {
             ps.setInt(1, paymentId);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? Optional.of(map(rs)) : Optional.empty();
@@ -199,6 +222,9 @@ public class PaymentDAO {
         p.setNotes(rs.getString("notas"));
         p.setStudentName(rs.getString("nombre_estudiante"));
         p.setGuardianName(rs.getString("nombre_acudiente"));
+        p.setClientDocumentType(rs.getString("tipo_documento_cliente"));
+        p.setClientDocument(rs.getString("documento_cliente"));
+        p.setClientAddress(rs.getString("direccion_cliente"));
         p.setConceptName(rs.getString("nombre_concepto"));
         return p;
     }

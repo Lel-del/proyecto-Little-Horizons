@@ -1,5 +1,7 @@
 package com.littlehorizons.erp.service;
 
+import com.littlehorizons.erp.config.DatabaseConnection;
+import com.littlehorizons.erp.dao.DatabaseException;
 import com.littlehorizons.erp.dao.InvoiceDAO;
 import com.littlehorizons.erp.dao.PaymentDAO;
 import com.littlehorizons.erp.model.Invoice;
@@ -15,6 +17,8 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
@@ -44,9 +48,25 @@ public class InvoiceService {
      * @return the generated invoice metadata
      */
     public Invoice generateInvoiceForPayment(int paymentId) {
-        Payment payment = paymentDAO.findById(paymentId)
+        try (Connection conn = DatabaseConnection.getInstance().getConnection()) {
+            return generateInvoiceForPayment(conn, paymentId);
+        } catch (SQLException ex) {
+            throw new DatabaseException("Error al generar la factura del pago " + paymentId, ex);
+        }
+    }
+
+    /**
+     * Generates the invoice TXT and inserts its metadata using an externally managed connection.
+     * The caller is responsible for committing or rolling back the transaction.
+     */
+    public Invoice generateInvoiceForPayment(Connection conn, int paymentId) {
+        Payment payment = paymentDAO.findById(paymentId, conn)
                 .orElseThrow(() -> new IllegalArgumentException("No existe el pago con ID " + paymentId));
-        String invoiceNumber = invoiceDAO.nextInvoiceNumber();
+        if (invoiceDAO.findByPayment(paymentId, conn).isPresent()) {
+            throw new IllegalStateException("El pago ID " + paymentId + " ya tiene una factura generada.");
+        }
+
+        String invoiceNumber = invoiceDAO.nextInvoiceNumber(conn);
         LocalDate issueDate = LocalDate.now();
         BigDecimal subtotal = payment.getAmountPaid().setScale(2, RoundingMode.HALF_UP);
         BigDecimal iva = subtotal.multiply(IVA_RATE).setScale(2, RoundingMode.HALF_UP);
@@ -63,6 +83,7 @@ public class InvoiceService {
                 writer.write(buildInvoiceContent(payment, invoiceNumber, issueDate, subtotal, iva, total, cufe));
             }
         } catch (IOException ex) {
+            deleteQuietly(filePath);
             AppLogger.getInstance().logError("InvoiceService.generateInvoiceForPayment",
                     "No fue posible escribir la factura " + filePath, ex);
             throw new IllegalStateException("No fue posible generar el archivo de la factura: " + ex.getMessage(), ex);
@@ -75,10 +96,26 @@ public class InvoiceService {
         invoice.setCufe(cufe);
         invoice.setFileName(fileName);
         invoice.setFilePath(filePath.toAbsolutePath().toString());
-        invoiceDAO.insert(invoice);
+        try {
+            invoiceDAO.insert(invoice, conn);
+        } catch (RuntimeException ex) {
+            deleteQuietly(filePath);
+            AppLogger.getInstance().logError("InvoiceService.generateInvoiceForPayment",
+                    "No fue posible registrar la factura " + invoiceNumber + "; se eliminó el TXT generado", ex);
+            throw ex;
+        }
         AppLogger.getInstance().logInfo("InvoiceService.generateInvoiceForPayment",
                 "Factura " + invoiceNumber + " generada en " + filePath.toAbsolutePath());
         return invoice;
+    }
+
+    private void deleteQuietly(Path filePath) {
+        try {
+            Files.deleteIfExists(filePath);
+        } catch (IOException ex) {
+            AppLogger.getInstance().logWarning("InvoiceService.deleteQuietly",
+                    "No fue posible eliminar el archivo temporal " + filePath + ": " + ex.getMessage());
+        }
     }
 
     private String buildInvoiceContent(Payment payment, String invoiceNumber, LocalDate issueDate,
@@ -101,8 +138,11 @@ public class InvoiceService {
                 payment.getGuardianName() != null ? payment.getGuardianName() : "No registrado"));
         sb.append(String.format("Estudiante            : %s%n",
                 payment.getStudentName() != null ? payment.getStudentName() : "No registrado"));
-        sb.append(String.format("Documento / Dirección : Ver registro de acudiente asociado al estudiante ID %d%n",
-                payment.getStudentId()));
+        sb.append(String.format("Documento             : %s %s%n",
+                payment.getClientDocumentType() != null ? payment.getClientDocumentType() : "N/A",
+                payment.getClientDocument() != null ? payment.getClientDocument() : "No registrado"));
+        sb.append(String.format("Dirección             : %s%n",
+                payment.getClientAddress() != null ? payment.getClientAddress() : "No registrada"));
         sb.append(separator).append('\n');
         sb.append("DETALLE DE LA FACTURA\n");
         sb.append(separator).append('\n');

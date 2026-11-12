@@ -11,7 +11,7 @@ import com.littlehorizons.erp.model.Payment;
 import com.littlehorizons.erp.model.PaymentConcept;
 import com.littlehorizons.erp.model.Student;
 import com.littlehorizons.erp.model.StudentFee;
-import com.littlehorizons.erp.service.InvoiceService;
+import com.littlehorizons.erp.service.PaymentService;
 import com.littlehorizons.erp.util.AppLogger;
 
 import java.math.BigDecimal;
@@ -34,7 +34,7 @@ public class FinancialController {
     private final InvoiceDAO invoiceDAO = new InvoiceDAO();
     private final StudentDAO studentDAO = new StudentDAO();
     private final GuardianDAO guardianDAO = new GuardianDAO();
-    private final InvoiceService invoiceService = new InvoiceService();
+    private final PaymentService paymentService = new PaymentService();
 
     public int registerConcept(PaymentConcept concept) {
         validateConcept(concept);
@@ -123,10 +123,10 @@ public class FinancialController {
         if (payment.getReceiptNumber() != null && paymentDAO.existsReceipt(payment.getReceiptNumber())) {
             throw new IllegalStateException("El número de recibo " + payment.getReceiptNumber() + " ya existe.");
         }
-        int paymentId = paymentDAO.insert(payment);
+        Invoice invoice = paymentService.registerPaymentWithInvoice(payment);
         AppLogger.getInstance().logInfo("FinancialController.registerPayment",
-                "Pago registrado ID " + paymentId + " por $" + payment.getAmountPaid());
-        return invoiceService.generateInvoiceForPayment(paymentId);
+                "Pago registrado ID " + invoice.getPaymentId() + " por $" + payment.getAmountPaid());
+        return invoice;
     }
 
     public List<Payment> listPaymentsByStudent(int studentId) {

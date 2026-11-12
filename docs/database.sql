@@ -11,6 +11,7 @@
 DROP DATABASE IF EXISTS erp_little_horizons;
 CREATE DATABASE erp_little_horizons CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE erp_little_horizons;
+SET NAMES utf8mb4;
 
 -- ----------------------------------------------------------------------------
 -- 1. MODULE: STUDENTS AND GUARDIANS
@@ -346,6 +347,7 @@ CREATE TABLE facturas (
     ruta_archivo VARCHAR(500) COMMENT 'Ruta completa donde se guardó la factura TXT',
     fecha_creacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (id_pago) REFERENCES pagos(id_pago) ON DELETE CASCADE,
+    UNIQUE KEY factura_pago_unica (id_pago),
     INDEX idx_numero_factura (numero_factura),
     INDEX idx_fecha_emision (fecha_emision),
     INDEX idx_pago (id_pago)

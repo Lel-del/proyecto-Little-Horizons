@@ -1,10 +1,14 @@
 package com.littlehorizons.erp.util;
 
 import java.io.BufferedWriter;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 
@@ -41,7 +45,9 @@ public final class AppLogger {
 
     private void writeEntry(String level, String context, String message, Throwable throwable) {
         String timestamp = LocalDateTime.now().format(TIMESTAMP_FORMAT);
-        try (BufferedWriter bw = new BufferedWriter(new FileWriter(LOG_FILE_PATH, true));
+        Path logPath = Paths.get(LOG_FILE_PATH);
+        try (BufferedWriter bw = Files.newBufferedWriter(logPath, StandardCharsets.UTF_8,
+                StandardOpenOption.CREATE, StandardOpenOption.APPEND);
              PrintWriter out = new PrintWriter(bw)) {
             out.printf("[%s] [%s] [%s] %s%n", timestamp, level, context, message);
             if (throwable != null) {

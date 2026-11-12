@@ -81,8 +81,10 @@ Little Horizons atiende a más de 500 estudiantes desde Preescolar hasta grado 1
 El script completo (DDL + DML) está en [`docs/database.sql`](docs/database.sql). Incluye la creación de la base `erp_little_horizons`, todas las tablas, restricciones y datos de prueba coherentes (mínimo 30 registros por tabla principal).
 
 ```bash
-mysql -u root -p < docs/database.sql
+mysql --default-character-set=utf8mb4 -u root -p < docs/database.sql
 ```
+
+> En Windows, si carga el script desde `cmd` o PowerShell, use `--default-character-set=utf8mb4` para conservar las tildes y la letra ñ en nombres de columnas y datos. El propio script también ejecuta `SET NAMES utf8mb4;`.
 
 O desde el cliente MySQL:
 
@@ -110,7 +112,9 @@ También puede usar variables de entorno (tienen prioridad sobre el archivo):
 
 Si `config/db.properties` no existe, la aplicación usa `config/db.properties.example` y luego valores por defecto (`root` sin contraseña).
 
-> `config/db.properties` está excluido en `.gitignore` para no versionar credenciales reales.
+> `config/db.properties` está excluido en `.gitignore` para no versionar credenciales reales. El archivo de ejemplo solo contiene valores vacíos.
+>
+> Para desarrollo local se usa `useSSL=false`; en un entorno real cambie a `sslMode=VERIFY_IDENTITY` y utilice un usuario MySQL dedicado con permisos mínimos en lugar de `root`.
 
 ### 6.3. Instalación del driver JDBC
 
@@ -203,7 +207,7 @@ La estructura sigue el ejemplo de la guía (`src/com/littlehorizons/erp/` con `m
 | `controller/` (lógica de negocio) | 7 controladores con validaciones |
 | `util/` (utilidades compartidas) | `AppLogger`, `ConsolePrinter`, `CufeGenerator`, `InputValidator` |
 | `dao/` (permitido por la guía) | 22 DAO + `DatabaseException` |
-| `service/` (permitido por la guía) | `InvoiceService`, `ReportExportService` |
+| `service/` (permitido por la guía) | `InvoiceService`, `PaymentService`, `LoanService`, `ClubService`, `ReportExportService` |
 | `config/` (permitido por la guía) | `DatabaseConnection` (Singleton JDBC) |
 | `docs/database.sql` | Sección 1 DDL + Sección 2 DML |
 | `README.md` | Las 16 secciones exigidas |
@@ -270,7 +274,10 @@ proyecto-littleHorizons/
 │       │   ├── Teacher.java
 │       │   └── TeacherAssignment.java
 │       ├── service/
+│       │   ├── ClubService.java
 │       │   ├── InvoiceService.java
+│       │   ├── LoanService.java
+│       │   ├── PaymentService.java
 │       │   └── ReportExportService.java
 │       ├── util/
 │       │   ├── AppLogger.java
@@ -339,7 +346,8 @@ error_log.txt                         # Registro de eventos y errores
 | **Singleton** | `DatabaseConnection`, `AppLogger` | Evita múltiples configuraciones de conexión y garantiza un único punto de escritura de logs. |
 | **DAO (Data Access Object)** | Paquete `dao` | Aísla el SQL del dominio y de la vista, facilitando mantenimiento y pruebas. |
 | **MVC** | `model`, `view`, `controller` | Separa presentación, lógica y datos según exige la guía. |
-| **Service Layer** | `InvoiceService`, `ReportExportService` | Encapsula procesos de negocio complejos (facturación y exportación) reutilizables por varios controladores. |
+| **Service Layer** | `InvoiceService`, `PaymentService`, `LoanService`, `ClubService`, `ReportExportService` | Encapsula procesos de negocio complejos (facturación, préstamos, cupos y exportación) reutilizables por varios controladores. |
+| **Transaction Script** | `PaymentService`, `LoanService`, `ClubService` | Agrupan varias operaciones JDBC en una sola transacción para mantener la consistencia (pago + factura, préstamo + estado del recurso, cupo + membresía). |
 | **Builder parcial / JavaBeans** | Modelos con setters | Construcción legible de entidades desde las vistas y mapeo uniforme desde JDBC. |
 | **Template de reportes** | `ReportExportService` | Formato homogéneo de todos los TXT generados. |
 
@@ -384,10 +392,10 @@ error_log.txt                         # Registro de eventos y errores
 ### 10.5. Módulo Financiero
 - Conceptos de pago (matrícula, pensión, uniforme, transporte, etc.).
 - Tarifas personalizadas por estudiante con porcentaje de descuento y motivo.
-- Registro de pagos con método, recibo, año y período.
+- Registro de pagos con método, recibo, año y período. El pago y su factura se confirman en una sola transacción: si falla la factura, el pago se revierte.
 - Historial por estudiante y por acudiente; total pagado.
 - Reporte de morosos (pensión sin pago por más de un mes).
-- **Factura electrónica TXT:** razón social, NIT, resolución simulada, datos del cliente, detalle, subtotal, IVA 19%, total, CUFE simulado (SHA-256) y bloque QR simulado. Se guarda en `invoices/factura_NNNNNN.txt`.
+- **Factura electrónica TXT:** razón social, NIT, resolución simulada, datos del cliente (acudiente, documento y dirección), detalle, subtotal, IVA 19%, total, CUFE simulado (SHA-256) y bloque QR simulado. Se guarda en `invoices/factura_NNNNNN.txt`.
 
 ### 10.6. Módulo de Recursos
 - Inventario por código único, categoría, ubicación y estado.
@@ -444,7 +452,9 @@ Ejemplo:
 - El IVA se aplica con una tasa fija del 19 % sobre el valor del pago; el esquema no distingue conceptos exentos.
 - La interfaz es de consola, por lo que la experiencia depende de una terminal con soporte UTF-8.
 - No se implementa autenticación ni control de roles: cualquier usuario con acceso al ejecutable puede operar el sistema.
-- El consecutivo de factura se calcula con `COUNT(*) + 1`; en un escenario concurrente real requeriría una secuencia transaccional.
+- El consecutivo de factura se calcula con `MAX(numero_factura) + 1` dentro de la transacción; la restricción `UNIQUE` impide duplicados, pero un despliegue multiusuario concurrente requeriría una tabla de secuencias o un servicio centralizado de numeración.
+- La URL de ejemplo usa `useSSL=false` para desarrollo local. En producción debe configurarse `sslMode=VERIFY_IDENTITY` y un usuario MySQL con permisos mínimos (no `root`).
+- Cada operación abre y cierra su propia conexión JDBC. Para un volumen alto de usuarios conviene incorporar un pool (por ejemplo, HikariCP).
 - La detección de morosos se basa en pagos registrados del concepto seleccionado y no en un estado de cartera formal.
 
 ---

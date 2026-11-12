@@ -1,0 +1,26 @@
+# Compiled Java files
+bin/
+out/
+target/
+*.class
+*.jar
+!lib/mysql-connector-j-*.jar
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# Runtime generated logs, invoices, reports
+error_log.txt
+invoices/*.txt
+reports/*.txt
+
+# Local DB credentials override
+config/db.properties
+
+# Assignment annex kept locally as reference (deliverable is docs/database.sql)
+script-bd-pry-erp-colegio-little-horizon.sql

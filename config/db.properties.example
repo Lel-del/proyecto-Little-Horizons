@@ -1,0 +1,8 @@
+# Database connection configuration for Little Horizons ERP
+# Copy or edit this file with your local MySQL 8.0+ credentials.
+# You can also override these values via environment variables:
+# LH_DB_URL, LH_DB_USER, LH_DB_PASSWORD
+
+db.url=jdbc:mysql://localhost:3306/erp_little_horizons?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Bogota
+db.user=root
+db.password=

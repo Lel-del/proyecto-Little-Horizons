@@ -10,6 +10,7 @@ import com.littlehorizons.erp.model.Club;
 import com.littlehorizons.erp.model.ClubMembership;
 import com.littlehorizons.erp.model.EventParticipant;
 import com.littlehorizons.erp.model.SchoolEvent;
+import com.littlehorizons.erp.service.ClubService;
 import com.littlehorizons.erp.util.AppLogger;
 
 import java.time.LocalDate;
@@ -34,6 +35,7 @@ public class ExtracurricularController {
     private final EventParticipantDAO participantDAO = new EventParticipantDAO();
     private final StudentDAO studentDAO = new StudentDAO();
     private final TeacherDAO teacherDAO = new TeacherDAO();
+    private final ClubService clubService = new ClubService();
 
     public int registerClub(Club club) {
         validateClub(club);
@@ -76,24 +78,7 @@ public class ExtracurricularController {
     public int enrollStudentInClub(int studentId, int clubId, LocalDate joinDate) {
         studentDAO.findById(studentId)
                 .orElseThrow(() -> new IllegalArgumentException("No existe el estudiante con ID " + studentId));
-        Club club = clubDAO.findById(clubId)
-                .orElseThrow(() -> new IllegalArgumentException("No existe el club con ID " + clubId));
-        if (!club.isActive()) {
-            throw new IllegalStateException("El club seleccionado no está activo.");
-        }
-        if (membershipDAO.existsActiveMembership(studentId, clubId)) {
-            throw new IllegalStateException("El estudiante ya está inscrito activamente en este club.");
-        }
-        int activeMembers = membershipDAO.countActiveMembers(clubId);
-        if (activeMembers >= club.getMaxCapacity()) {
-            throw new IllegalStateException("El club alcanzó su cupo máximo de " + club.getMaxCapacity() + " estudiantes.");
-        }
-        ClubMembership membership = new ClubMembership();
-        membership.setStudentId(studentId);
-        membership.setClubId(clubId);
-        membership.setJoinDate(joinDate != null ? joinDate : LocalDate.now());
-        membership.setMembershipStatus("Activa");
-        int id = membershipDAO.insert(membership);
+        int id = clubService.enrollStudent(studentId, clubId, joinDate);
         AppLogger.getInstance().logInfo("ExtracurricularController.enrollStudentInClub",
                 "Membresía " + id + " creada para estudiante " + studentId + " en club " + clubId);
         return id;

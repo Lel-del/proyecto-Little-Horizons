@@ -8,6 +8,7 @@ import com.littlehorizons.erp.dao.TeacherDAO;
 import com.littlehorizons.erp.model.Resource;
 import com.littlehorizons.erp.model.ResourceCategory;
 import com.littlehorizons.erp.model.ResourceLoan;
+import com.littlehorizons.erp.service.LoanService;
 import com.littlehorizons.erp.util.AppLogger;
 
 import java.time.LocalDate;
@@ -27,6 +28,7 @@ public class ResourceController {
     private final ResourceLoanDAO loanDAO = new ResourceLoanDAO();
     private final StudentDAO studentDAO = new StudentDAO();
     private final TeacherDAO teacherDAO = new TeacherDAO();
+    private final LoanService loanService = new LoanService();
 
     public int registerResource(Resource resource) {
         validateResource(resource);
@@ -96,11 +98,9 @@ public class ResourceController {
      */
     public int loanToStudent(int resourceId, int studentId, LocalDate loanDate,
                              LocalDate expectedReturnDate, String observations) {
-        Resource resource = findResource(resourceId);
         studentDAO.findById(studentId)
                 .orElseThrow(() -> new IllegalArgumentException("No existe el estudiante con ID " + studentId));
         validateLoanDates(loanDate, expectedReturnDate);
-        validateResourceAvailable(resource);
         ResourceLoan loan = new ResourceLoan();
         loan.setResourceId(resourceId);
         loan.setStudentId(studentId);
@@ -108,8 +108,7 @@ public class ResourceController {
         loan.setExpectedReturnDate(expectedReturnDate);
         loan.setLoanStatus("Activo");
         loan.setObservations(observations);
-        int id = loanDAO.insert(loan, ResourceLoanDAO.BorrowerType.ESTUDIANTE);
-        resourceDAO.updateStatus(resourceId, "Prestado");
+        int id = loanService.registerLoan(loan, ResourceLoanDAO.BorrowerType.ESTUDIANTE);
         AppLogger.getInstance().logInfo("ResourceController.loanToStudent",
                 "Préstamo " + id + " del recurso " + resourceId + " al estudiante " + studentId);
         return id;
@@ -120,11 +119,9 @@ public class ResourceController {
      */
     public int loanToTeacher(int resourceId, int teacherId, LocalDate loanDate,
                              LocalDate expectedReturnDate, String observations) {
-        Resource resource = findResource(resourceId);
         teacherDAO.findById(teacherId)
                 .orElseThrow(() -> new IllegalArgumentException("No existe el profesor con ID " + teacherId));
         validateLoanDates(loanDate, expectedReturnDate);
-        validateResourceAvailable(resource);
         ResourceLoan loan = new ResourceLoan();
         loan.setResourceId(resourceId);
         loan.setTeacherId(teacherId);
@@ -132,8 +129,7 @@ public class ResourceController {
         loan.setExpectedReturnDate(expectedReturnDate);
         loan.setLoanStatus("Activo");
         loan.setObservations(observations);
-        int id = loanDAO.insert(loan, ResourceLoanDAO.BorrowerType.PROFESOR);
-        resourceDAO.updateStatus(resourceId, "Prestado");
+        int id = loanService.registerLoan(loan, ResourceLoanDAO.BorrowerType.PROFESOR);
         AppLogger.getInstance().logInfo("ResourceController.loanToTeacher",
                 "Préstamo " + id + " del recurso " + resourceId + " al profesor " + teacherId);
         return id;
@@ -149,10 +145,9 @@ public class ResourceController {
         ResourceLoanDAO.BorrowerType type = "Profesor".equalsIgnoreCase(loan.getBorrowerType())
                 ? ResourceLoanDAO.BorrowerType.PROFESOR
                 : ResourceLoanDAO.BorrowerType.ESTUDIANTE;
-        boolean updated = loanDAO.registerReturn(loan.getLoanId(), type,
+        boolean updated = loanService.registerReturn(loan, type,
                 returnDate != null ? returnDate : LocalDate.now());
         if (updated) {
-            resourceDAO.updateStatus(loan.getResourceId(), "Disponible");
             AppLogger.getInstance().logInfo("ResourceController.registerReturn",
                     "Devolución registrada para préstamo " + loan.getLoanId());
         }
@@ -190,15 +185,6 @@ public class ResourceController {
             }
         }
         return overdue;
-    }
-
-    private void validateResourceAvailable(Resource resource) {
-        if (!"Disponible".equalsIgnoreCase(resource.getResourceStatus())) {
-            throw new IllegalStateException("El recurso no está disponible. Estado actual: " + resource.getResourceStatus());
-        }
-        if (loanDAO.hasActiveLoanForResource(resource.getResourceId())) {
-            throw new IllegalStateException("El recurso ya tiene un préstamo activo registrado.");
-        }
     }
 
     private void validateLoanDates(LocalDate loanDate, LocalDate expectedReturnDate) {

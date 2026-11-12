@@ -34,12 +34,22 @@ public class ResourceLoanDAO {
             "JOIN profesores p ON p.id_profesor = pp.id_profesor ";
 
     public int insert(ResourceLoan loan, BorrowerType borrowerType) {
+        try (Connection conn = DatabaseConnection.getInstance().getConnection()) {
+            return insert(loan, borrowerType, conn);
+        } catch (SQLException ex) {
+            throw new DatabaseException("Error al registrar el préstamo de recurso", ex);
+        }
+    }
+
+    /**
+     * Inserts a loan using an externally managed connection (transaction-aware).
+     */
+    public int insert(ResourceLoan loan, BorrowerType borrowerType, Connection conn) {
         String table = borrowerType == BorrowerType.ESTUDIANTE ? "prestamos_estudiante" : "prestamos_profesor";
         String borrowerColumn = borrowerType == BorrowerType.ESTUDIANTE ? "id_estudiante" : "id_profesor";
         String sql = "INSERT INTO " + table + " (id_recurso, " + borrowerColumn + ", fecha_prestamo, " +
                 "fecha_devolucion_esperada, estado_prestamo, observaciones) VALUES (?, ?, ?, ?, ?, ?)";
-        try (Connection conn = DatabaseConnection.getInstance().getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setInt(1, loan.getResourceId());
             ps.setInt(2, borrowerType == BorrowerType.ESTUDIANTE ? loan.getStudentId() : loan.getTeacherId());
             ps.setDate(3, Date.valueOf(loan.getLoanDate()));
@@ -61,11 +71,22 @@ public class ResourceLoanDAO {
     }
 
     public boolean registerReturn(int loanId, BorrowerType borrowerType, java.time.LocalDate returnDate) {
+        try (Connection conn = DatabaseConnection.getInstance().getConnection()) {
+            return registerReturn(loanId, borrowerType, returnDate, conn);
+        } catch (SQLException ex) {
+            throw new DatabaseException("Error al registrar la devolución del recurso", ex);
+        }
+    }
+
+    /**
+     * Registers a return using an externally managed connection.
+     */
+    public boolean registerReturn(int loanId, BorrowerType borrowerType, java.time.LocalDate returnDate,
+                                  Connection conn) {
         String table = borrowerType == BorrowerType.ESTUDIANTE ? "prestamos_estudiante" : "prestamos_profesor";
         String sql = "UPDATE " + table + " SET fecha_devolucion_real = ?, estado_prestamo = 'Devuelto' " +
-                "WHERE id_prestamo = ?";
-        try (Connection conn = DatabaseConnection.getInstance().getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+                "WHERE id_prestamo = ? AND estado_prestamo <> 'Devuelto'";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setDate(1, Date.valueOf(returnDate));
             ps.setInt(2, loanId);
             return ps.executeUpdate() > 0;
@@ -118,10 +139,20 @@ public class ResourceLoanDAO {
     }
 
     public boolean hasActiveLoanForResource(int resourceId) {
+        try (Connection conn = DatabaseConnection.getInstance().getConnection()) {
+            return hasActiveLoanForResource(resourceId, conn);
+        } catch (SQLException ex) {
+            throw new DatabaseException("Error al validar préstamos activos del recurso", ex);
+        }
+    }
+
+    /**
+     * Checks active loans using an externally managed connection.
+     */
+    public boolean hasActiveLoanForResource(int resourceId, Connection conn) {
         String sql = "SELECT (SELECT COUNT(*) FROM prestamos_estudiante WHERE id_recurso = ? AND estado_prestamo IN ('Activo','Vencido')) + " +
                 "(SELECT COUNT(*) FROM prestamos_profesor WHERE id_recurso = ? AND estado_prestamo IN ('Activo','Vencido')) AS total";
-        try (Connection conn = DatabaseConnection.getInstance().getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, resourceId);
             ps.setInt(2, resourceId);
             try (ResultSet rs = ps.executeQuery()) {

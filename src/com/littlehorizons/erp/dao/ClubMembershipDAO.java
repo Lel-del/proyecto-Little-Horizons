@@ -24,10 +24,20 @@ public class ClubMembershipDAO {
             "JOIN clubes c ON c.id_club = mc.id_club ";
 
     public int insert(ClubMembership membership) {
+        try (Connection conn = DatabaseConnection.getInstance().getConnection()) {
+            return insert(membership, conn);
+        } catch (SQLException ex) {
+            throw new DatabaseException("Error al inscribir al estudiante en el club", ex);
+        }
+    }
+
+    /**
+     * Inserts a membership using an externally managed connection (transaction-aware).
+     */
+    public int insert(ClubMembership membership, Connection conn) {
         String sql = "INSERT INTO membresias_club (id_estudiante, id_club, fecha_ingreso, estado_membresia) " +
                 "VALUES (?, ?, ?, ?)";
-        try (Connection conn = DatabaseConnection.getInstance().getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setInt(1, membership.getStudentId());
             ps.setInt(2, membership.getClubId());
             ps.setDate(3, Date.valueOf(membership.getJoinDate()));
@@ -94,9 +104,19 @@ public class ClubMembershipDAO {
     }
 
     public boolean existsActiveMembership(int studentId, int clubId) {
+        try (Connection conn = DatabaseConnection.getInstance().getConnection()) {
+            return existsActiveMembership(studentId, clubId, conn);
+        } catch (SQLException ex) {
+            throw new DatabaseException("Error al validar la membresía activa", ex);
+        }
+    }
+
+    /**
+     * Checks an active membership using an externally managed connection.
+     */
+    public boolean existsActiveMembership(int studentId, int clubId, Connection conn) {
         String sql = "SELECT 1 FROM membresias_club WHERE id_estudiante = ? AND id_club = ? AND estado_membresia = 'Activa'";
-        try (Connection conn = DatabaseConnection.getInstance().getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, studentId);
             ps.setInt(2, clubId);
             try (ResultSet rs = ps.executeQuery()) {
@@ -108,9 +128,19 @@ public class ClubMembershipDAO {
     }
 
     public int countActiveMembers(int clubId) {
+        try (Connection conn = DatabaseConnection.getInstance().getConnection()) {
+            return countActiveMembers(clubId, conn);
+        } catch (SQLException ex) {
+            throw new DatabaseException("Error al contar miembros del club", ex);
+        }
+    }
+
+    /**
+     * Counts active members using an externally managed connection.
+     */
+    public int countActiveMembers(int clubId, Connection conn) {
         String sql = "SELECT COUNT(*) FROM membresias_club WHERE id_club = ? AND estado_membresia = 'Activa'";
-        try (Connection conn = DatabaseConnection.getInstance().getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, clubId);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? rs.getInt(1) : 0;

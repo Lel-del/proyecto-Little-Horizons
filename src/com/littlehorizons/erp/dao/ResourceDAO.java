@@ -68,9 +68,19 @@ public class ResourceDAO {
     }
 
     public boolean updateStatus(int resourceId, String status) {
+        try (Connection conn = DatabaseConnection.getInstance().getConnection()) {
+            return updateStatus(resourceId, status, conn);
+        } catch (SQLException ex) {
+            throw new DatabaseException("Error al actualizar el estado del recurso", ex);
+        }
+    }
+
+    /**
+     * Updates the resource status using an externally managed connection.
+     */
+    public boolean updateStatus(int resourceId, String status, Connection conn) {
         String sql = "UPDATE recursos SET estado_recurso = ? WHERE id_recurso = ?";
-        try (Connection conn = DatabaseConnection.getInstance().getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, status);
             ps.setInt(2, resourceId);
             return ps.executeUpdate() > 0;
@@ -91,14 +101,38 @@ public class ResourceDAO {
     }
 
     public Optional<Resource> findById(int resourceId) {
-        try (Connection conn = DatabaseConnection.getInstance().getConnection();
-             PreparedStatement ps = conn.prepareStatement(SELECT_BASE + "WHERE r.id_recurso = ?")) {
+        try (Connection conn = DatabaseConnection.getInstance().getConnection()) {
+            return findById(resourceId, conn);
+        } catch (SQLException ex) {
+            throw new DatabaseException("Error al consultar el recurso ID " + resourceId, ex);
+        }
+    }
+
+    /**
+     * Finds a resource using an externally managed connection.
+     */
+    public Optional<Resource> findById(int resourceId, Connection conn) {
+        try (PreparedStatement ps = conn.prepareStatement(SELECT_BASE + "WHERE r.id_recurso = ?")) {
             ps.setInt(1, resourceId);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? Optional.of(map(rs)) : Optional.empty();
             }
         } catch (SQLException ex) {
             throw new DatabaseException("Error al consultar el recurso ID " + resourceId, ex);
+        }
+    }
+
+    /**
+     * Locks a resource row for the duration of a transaction, preventing concurrent loans.
+     */
+    public Optional<Resource> findByIdForUpdate(int resourceId, Connection conn) {
+        try (PreparedStatement ps = conn.prepareStatement(SELECT_BASE + "WHERE r.id_recurso = ? FOR UPDATE")) {
+            ps.setInt(1, resourceId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? Optional.of(map(rs)) : Optional.empty();
+            }
+        } catch (SQLException ex) {
+            throw new DatabaseException("Error al bloquear el recurso ID " + resourceId + " para préstamo", ex);
         }
     }
 

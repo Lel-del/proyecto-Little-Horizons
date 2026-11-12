@@ -86,14 +86,41 @@ public class ClubDAO {
     }
 
     public Optional<Club> findById(int clubId) {
-        try (Connection conn = DatabaseConnection.getInstance().getConnection();
-             PreparedStatement ps = conn.prepareStatement(SELECT_BASE + "WHERE c.id_club = ?")) {
+        try (Connection conn = DatabaseConnection.getInstance().getConnection()) {
+            return findById(clubId, conn);
+        } catch (SQLException ex) {
+            throw new DatabaseException("Error al consultar el club ID " + clubId, ex);
+        }
+    }
+
+    /**
+     * Finds a club using an externally managed connection.
+     */
+    public Optional<Club> findById(int clubId, Connection conn) {
+        try (PreparedStatement ps = conn.prepareStatement(SELECT_BASE + "WHERE c.id_club = ?")) {
             ps.setInt(1, clubId);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? Optional.of(map(rs)) : Optional.empty();
             }
         } catch (SQLException ex) {
             throw new DatabaseException("Error al consultar el club ID " + clubId, ex);
+        }
+    }
+
+    /**
+     * Locks the club row so capacity checks and inserts cannot interleave with other enrollments.
+     *
+     * @return true when the club exists
+     */
+    public boolean lockById(int clubId, Connection conn) {
+        String sql = "SELECT 1 FROM clubes WHERE id_club = ? FOR UPDATE";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, clubId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        } catch (SQLException ex) {
+            throw new DatabaseException("Error al bloquear el club ID " + clubId, ex);
         }
     }
 

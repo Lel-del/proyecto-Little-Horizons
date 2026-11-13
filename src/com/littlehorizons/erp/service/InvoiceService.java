@@ -138,9 +138,12 @@ public class InvoiceService {
                 payment.getGuardianName() != null ? payment.getGuardianName() : "No registrado"));
         sb.append(String.format("Estudiante            : %s%n",
                 payment.getStudentName() != null ? payment.getStudentName() : "No registrado"));
-        sb.append(String.format("Documento             : %s %s%n",
-                payment.getClientDocumentType() != null ? payment.getClientDocumentType() : "N/A",
-                payment.getClientDocument() != null ? payment.getClientDocument() : "No registrado"));
+        String documentType = payment.getClientDocumentType();
+        String documentNumber = payment.getClientDocument();
+        String document = documentNumber != null
+                ? (documentType != null ? documentType + " " : "") + documentNumber
+                : "No registrado";
+        sb.append(String.format("Documento             : %s%n", document));
         sb.append(String.format("Dirección             : %s%n",
                 payment.getClientAddress() != null ? payment.getClientAddress() : "No registrada"));
         sb.append(separator).append('\n');

@@ -78,19 +78,22 @@ public class SubjectEnrollmentDAO {
         return list;
     }
 
-    public boolean existsForYear(int studentId, int subjectId, int academicYear) {
+    public boolean existsForPeriod(int studentId, int subjectId, int academicYear, String period) {
         String sql = "SELECT 1 FROM inscripciones_materia WHERE id_estudiante = ? AND id_materia = ? " +
-                "AND `año_academico` = ?";
+                "AND `año_academico` = ? AND (periodo_academico = ? OR ? = 'Final') " +
+                "AND estado <> 'Retirada'";
         try (Connection conn = DatabaseConnection.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, studentId);
             ps.setInt(2, subjectId);
             ps.setInt(3, academicYear);
+            ps.setString(4, period);
+            ps.setString(5, period);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next();
             }
         } catch (SQLException ex) {
-            throw new DatabaseException("Error al validar la inscripción anual de la materia", ex);
+            throw new DatabaseException("Error al validar la inscripción de la materia para el período", ex);
         }
     }
 

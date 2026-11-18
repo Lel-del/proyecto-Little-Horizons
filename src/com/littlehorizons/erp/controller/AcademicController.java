@@ -100,11 +100,13 @@ public class AcademicController {
                 record.getAcademicYear(), record.getAcademicPeriod())) {
             throw new IllegalStateException("Ya existe una nota registrada para ese estudiante, materia y período.");
         }
-        if (!subjectEnrollmentDAO.existsForYear(record.getStudentId(), record.getSubjectId(), record.getAcademicYear())) {
-            throw new IllegalStateException("El estudiante no está inscrito en la materia para el año indicado.");
+        if (!subjectEnrollmentDAO.existsForPeriod(record.getStudentId(), record.getSubjectId(),
+                record.getAcademicYear(), record.getAcademicPeriod())) {
+            throw new IllegalStateException("El estudiante no está inscrito activamente en la materia para el período indicado.");
         }
         boolean teachesSubject = assignmentDAO.findByTeacher(record.getTeacherId()).stream()
-                .anyMatch(a -> a.getSubjectId() == record.getSubjectId());
+                .anyMatch(a -> a.getSubjectId() == record.getSubjectId()
+                        && a.getAcademicYear() == record.getAcademicYear());
         if (!teachesSubject) {
             throw new IllegalStateException("El profesor indicado no tiene asignada la materia seleccionada.");
         }
@@ -153,7 +155,8 @@ public class AcademicController {
 
         Map<String, BigDecimal> averages = new java.util.LinkedHashMap<>();
         for (Map.Entry<Integer, String> entry : subjectNames.entrySet()) {
-            BigDecimal subjectAverage = recordDAO.calculateStudentSubjectAverage(studentId, entry.getKey(), academicYear);
+            BigDecimal subjectAverage = recordDAO.calculateStudentSubjectAverage(
+                    studentId, entry.getKey(), academicYear, period);
             BigDecimal courseAverage = recordDAO.calculateCourseSubjectAverage(entry.getKey(), academicYear, period);
             averages.put(entry.getValue() + " (Estudiante)",
                     subjectAverage != null ? subjectAverage : BigDecimal.ZERO);

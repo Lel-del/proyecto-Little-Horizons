@@ -107,7 +107,7 @@ public class AttendanceDAO {
                 "COUNT(*) AS total_ausencias FROM asistencias a " +
                 "JOIN estudiantes e ON e.id_estudiante = a.id_estudiante " +
                 "WHERE a.estado_asistencia = 'Ausente' AND a.fecha_asistencia BETWEEN ? AND ? " +
-                "GROUP BY e.id_estudiante, estudiante HAVING COUNT(*) > ? ORDER BY total_ausencias DESC";
+                "GROUP BY e.id_estudiante, estudiante HAVING COUNT(*) >= ? ORDER BY total_ausencias DESC";
         List<String> results = new ArrayList<>();
         try (Connection conn = DatabaseConnection.getInstance().getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {

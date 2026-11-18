@@ -157,10 +157,21 @@ public class AcademicRecordDAO {
     /**
      * Average grade of a student in one subject for the whole academic year.
      */
-    public BigDecimal calculateStudentSubjectAverage(int studentId, int subjectId, int academicYear) {
+    public BigDecimal calculateStudentSubjectAverage(int studentId, int subjectId, int academicYear, String period) {
         String sql = "SELECT AVG(valor_nota) FROM registros_academicos WHERE id_estudiante = ? " +
-                "AND id_materia = ? AND `año_academico` = ? AND periodo_academico <> 'Final'";
-        return queryAverage(sql, studentId, subjectId, academicYear);
+                "AND id_materia = ? AND `año_academico` = ? AND periodo_academico = ?";
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, studentId);
+            ps.setInt(2, subjectId);
+            ps.setInt(3, academicYear);
+            ps.setString(4, period);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? round(rs.getBigDecimal(1)) : null;
+            }
+        } catch (SQLException ex) {
+            throw new DatabaseException("Error al calcular el promedio del estudiante por materia y período", ex);
+        }
     }
 
     /**

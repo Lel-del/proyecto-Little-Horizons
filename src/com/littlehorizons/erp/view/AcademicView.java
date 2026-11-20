@@ -5,12 +5,16 @@ import com.littlehorizons.erp.model.AcademicRecord;
 import com.littlehorizons.erp.model.Attendance;
 import com.littlehorizons.erp.model.Subject;
 import com.littlehorizons.erp.model.Teacher;
+import com.littlehorizons.erp.service.AcademicPerformanceService;
+import com.littlehorizons.erp.service.ReportExportService;
 import com.littlehorizons.erp.util.AppLogger;
 import com.littlehorizons.erp.util.ConsolePrinter;
 import com.littlehorizons.erp.util.InputValidator;
 
 import java.math.BigDecimal;
+import java.nio.file.Path;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -41,8 +45,9 @@ public class AcademicView {
             System.out.println("8. Registrar asistencia");
             System.out.println("9. Reporte de inasistencias");
             System.out.println("10. Reporte de bajo rendimiento");
+            System.out.println("11. Reporte de rendimiento académico por materia");
             System.out.println("0. Volver al menú principal");
-            option = input.readInt("Seleccione una opción: ", 0, 10);
+            option = input.readInt("Seleccione una opción: ", 0, 11);
             try {
                 handle(option);
             } catch (IllegalArgumentException | IllegalStateException ex) {
@@ -86,6 +91,9 @@ public class AcademicView {
                 break;
             case 10:
                 lowPerformanceReport();
+                break;
+            case 11:
+                subjectPerformanceReport();
                 break;
             default:
                 break;
@@ -231,6 +239,38 @@ public class AcademicView {
         } else {
             report.forEach(System.out::println);
         }
+        input.waitForEnter();
+    }
+
+    private void subjectPerformanceReport() {
+        String title = "REPORTE DE RENDIMIENTO ACADÉMICO POR MATERIA";
+        ConsolePrinter.printSectionHeader(title);
+        AcademicPerformanceService.Report report = controller.generateSubjectPerformanceReport();
+        if (report.ranking().isEmpty()) {
+            ConsolePrinter.printInfo("No hay registros académicos suficientes para generar estadísticas.");
+            input.waitForEnter();
+            return;
+        }
+
+        List<String> lines = new ArrayList<>();
+        lines.add("PROMEDIO GENERAL POR MATERIA (de mayor a menor)");
+        lines.add("");
+        for (AcademicPerformanceService.SubjectAverage row : report.ranking()) {
+            lines.add(String.format("Código: %-12s | Materia: %-35s | Promedio: %s",
+                    row.subject().code(), row.subject().name(), row.average().toPlainString()));
+        }
+        lines.add("");
+        lines.add(report.topSubjects().size() == 1
+                ? "MATERIA CON MEJOR RENDIMIENTO"
+                : "MATERIAS CON MEJOR RENDIMIENTO (Empate)");
+        for (AcademicPerformanceService.SubjectAverage row : report.topSubjects()) {
+            lines.add(String.format("- %s | Promedio: %s",
+                    row.subject().name(), row.average().toPlainString()));
+        }
+
+        lines.forEach(System.out::println);
+        Path reportFile = ReportExportService.exportReport("rendimiento_academico_por_materia", title, lines);
+        ConsolePrinter.printSuccess("Reporte TXT generado en: " + reportFile);
         input.waitForEnter();
     }
 }

@@ -12,6 +12,7 @@ import com.littlehorizons.erp.model.Attendance;
 import com.littlehorizons.erp.model.Grade;
 import com.littlehorizons.erp.model.Subject;
 import com.littlehorizons.erp.model.TeacherAssignment;
+import com.littlehorizons.erp.service.AcademicPerformanceService;
 import com.littlehorizons.erp.util.AppLogger;
 
 import java.math.BigDecimal;
@@ -196,6 +197,10 @@ public class AcademicController {
             throw new IllegalArgumentException("La fecha inicial no puede ser posterior a la fecha final.");
         }
         return attendanceDAO.findStudentsWithExcessiveAbsences(minAbsences, from, to);
+    }
+
+    public AcademicPerformanceService.Report generateSubjectPerformanceReport() {
+        return new AcademicPerformanceService().calculate(recordDAO.findGradesForPerformanceReport());
     }
 
     public List<String> generateLowPerformanceReport(BigDecimal threshold, int academicYear, String period) {

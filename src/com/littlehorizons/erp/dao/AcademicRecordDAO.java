@@ -2,6 +2,7 @@ package com.littlehorizons.erp.dao;
 
 import com.littlehorizons.erp.config.DatabaseConnection;
 import com.littlehorizons.erp.model.AcademicRecord;
+import com.littlehorizons.erp.model.SubjectGrade;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -25,6 +26,26 @@ public class AcademicRecordDAO {
             "JOIN estudiantes e ON e.id_estudiante = r.id_estudiante " +
             "JOIN materias m ON m.id_materia = r.id_materia " +
             "JOIN profesores p ON p.id_profesor = r.id_profesor ";
+
+    public List<SubjectGrade> findGradesForPerformanceReport() {
+        String sql = "SELECT r.id_registro, r.valor_nota, r.periodo_academico, "
+                + "m.id_materia, m.codigo_materia, m.nombre_materia "
+                + "FROM registros_academicos r JOIN materias m ON m.id_materia = r.id_materia";
+        List<SubjectGrade> grades = new ArrayList<>();
+        try (Connection conn = DatabaseConnection.getInstance().getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                SubjectGrade.Subject subject = new SubjectGrade.Subject(rs.getInt("id_materia"),
+                        rs.getString("codigo_materia"), rs.getString("nombre_materia"));
+                grades.add(new SubjectGrade(rs.getInt("id_registro"), rs.getBigDecimal("valor_nota"),
+                        rs.getString("periodo_academico"), subject));
+            }
+            return grades;
+        } catch (SQLException ex) {
+            throw new DatabaseException("Error al consultar las notas para el reporte por materia", ex);
+        }
+    }
 
     public int insert(AcademicRecord record) {
         String sql = "INSERT INTO registros_academicos (id_estudiante, id_materia, id_profesor, `año_academico`, " +
